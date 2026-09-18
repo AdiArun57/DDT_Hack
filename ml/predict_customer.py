@@ -7,12 +7,11 @@ from transaction_categorizer import TransactionCategorizer
 from feature_engineering import engineer_advanced_features
 from stability_report import calculate_stability_score, generate_recommendation
 
-def run_inference(customer_transactions):
+def run_inference(customer_name, customer_transactions):
     """
     Runs a full pipeline for a single customer.
-    customer_transactions: List of dicts [{'date': '...', 'desc': '...', 'withdrawal': 0, 'deposit': 0, 'balance': 0}]
     """
-    print("\n--- Processing Customer Profile ---")
+    print(f"\n--- Processing Profile: {customer_name} ---")
 
     # 1. Convert to DataFrame
     df = pd.DataFrame(customer_transactions)
@@ -23,7 +22,6 @@ def run_inference(customer_transactions):
 
     # 2. Categorize Transactions
     categorizer = TransactionCategorizer()
-    # Seed labels (matching Phase 2)
     examples = {
         'Housing': ['UPI RENT PAYMENT', 'HOUSE RENT', 'MORTGAGE PAYMENT', 'SOCIETY MAINTENANCE'],
         'Income': ['NEFT SALARY CREDIT', 'DIRECT DEPOSIT SALARY', 'INTEREST CREDIT', 'BONUS'],
@@ -42,14 +40,12 @@ def run_inference(customer_transactions):
     # 4. Predict Stress (using trained model)
     try:
         model = joblib.load('ml/stress_model.joblib')
-        # Match features to model training columns
-        # The model expects: ['burn_rate', 'essential_ratio', 'discretionary_ratio',
-        # 'withdrawal_volatility', 'savings_buffer', 'income_consistency', 'balance_trend', 'final_balance']
         X = features_df.drop(['account_number'], axis=1)
         stress_prob = model.predict_proba(X)[0][1]
-        stress_risk = "High" if stress_prob > 0.5 else "Low/Medium"
+        # STRICT BINARY RISK: Only High or Low
+        stress_risk = "High" if stress_prob > 0.5 else "Low"
     except Exception as e:
-        stress_risk = "Unknown (Model not found)"
+        stress_risk = "Unknown"
         print(f"Model Error: {e}")
 
     # 5. Stability Score & Recommendation
@@ -61,7 +57,7 @@ def run_inference(customer_transactions):
 
     # Print final "Customer Health Card"
     print("\n==========================================")
-    print("       CREDITBRIDGE CUSTOMER PROFILE      ")
+    print(f"       PROFILE: {customer_name}")
     print("==========================================")
     print(f"Overall Stability Score: {final_score}/100")
     print(f"Financial Stress Risk:   {stress_risk}")
@@ -72,26 +68,92 @@ def run_inference(customer_transactions):
     print("==========================================\n")
 
 if __name__ == "__main__":
-    # TEST CASE 1: Stable User (Regular income, low spend, high buffer)
-    stable_user = [
-        {'date': '2023-01-01', 'desc': 'NEFT SALARY CREDIT', 'withdrawal': 0, 'deposit': 5000, 'balance': 5000},
-        {'date': '2023-01-05', 'desc': 'UPI RENT PAYMENT', 'withdrawal': 1000, 'deposit': 0, 'balance': 4000},
-        {'date': '2023-01-10', 'desc': 'SWIGGY ORDER', 'withdrawal': 200, 'deposit': 0, 'balance': 3800},
-        {'date': '2023-02-01', 'desc': 'NEFT SALARY CREDIT', 'withdrawal': 0, 'deposit': 5000, 'balance': 8800},
-        {'date': '2023-02-05', 'desc': 'UPI RENT PAYMENT', 'withdrawal': 1000, 'deposit': 0, 'balance': 7800},
-    ]
+    test_cases = {
+        "The Ideal Saver": [
+            {'date': '2023-01-01', 'desc': 'NEFT SALARY CREDIT', 'withdrawal': 0, 'deposit': 5000, 'balance': 5000},
+            {'date': '2023-01-05', 'desc': 'UPI RENT PAYMENT', 'withdrawal': 500, 'deposit': 0, 'balance': 4500},
+            {'date': '2023-02-01', 'desc': 'NEFT SALARY CREDIT', 'withdrawal': 0, 'deposit': 5000, 'balance': 9500},
+            {'date': '2023-02-05', 'desc': 'UPI RENT PAYMENT', 'withdrawal': 500, 'deposit': 0, 'balance': 9000},
+        ],
+        "The High-Burn Professional": [
+            {'date': '2023-01-01', 'desc': 'NEFT SALARY CREDIT', 'withdrawal': 0, 'deposit': 10000, 'balance': 10000},
+            {'date': '2023-01-02', 'desc': 'APPLE STORE', 'withdrawal': 8000, 'deposit': 0, 'balance': 2000},
+            {'date': '2023-01-05', 'desc': 'ZOMATO DELIVERY', 'withdrawal': 1000, 'deposit': 0, 'balance': 1000},
+            {'date': '2023-01-10', 'desc': 'UBER TRIP', 'withdrawal': 1500, 'deposit': 0, 'balance': -500},
+        ],
+        "The Irregular Freelancer": [
+            {'date': '2023-01-01', 'desc': 'PROJECT PAYMENT', 'withdrawal': 0, 'deposit': 2000, 'balance': 2000},
+            {'date': '2023-01-05', 'desc': 'HOUSE RENT', 'withdrawal': 1500, 'deposit': 0, 'balance': 500},
+            {'date': '2023-02-15', 'desc': 'PROJECT PAYMENT', 'withdrawal': 0, 'deposit': 1000, 'balance': 1500},
+            {'date': '2023-02-20', 'desc': 'ELECTRICITY BILL', 'withdrawal': 1200, 'deposit': 0, 'balance': 300},
+        ],
+        "The Debt Cycle": [
+            {'date': '2023-01-01', 'desc': 'CASH DEPOSIT', 'withdrawal': 0, 'deposit': 500, 'balance': 500},
+            {'date': '2023-01-02', 'desc': 'ATM CASH WITHDRAWAL', 'withdrawal': 600, 'deposit': 0, 'balance': -100},
+            {'date': '2023-01-05', 'desc': 'CASH DEPOSIT', 'withdrawal': 0, 'deposit': 200, 'balance': 100},
+            {'date': '2023-01-06', 'desc': 'ZOMATO DELIVERY', 'withdrawal': 300, 'deposit': 0, 'balance': -200},
+        ],
+        "The New Graduate": [
+            {'date': '2023-01-01', 'desc': 'PARENTAL SUPPORT', 'withdrawal': 0, 'deposit': 1000, 'balance': 1000},
+            {'date': '2023-01-05', 'desc': 'METRO RECHARGE', 'withdrawal': 200, 'deposit': 0, 'balance': 800},
+            {'date': '2023-01-10', 'desc': 'STARBUCKS', 'withdrawal': 300, 'deposit': 0, 'balance': 500},
+            {'date': '2023-01-20', 'desc': 'GROCERIES', 'withdrawal': 400, 'deposit': 0, 'balance': 100},
+        ],
+        "The Minimalist": [
+            {'date': '2023-01-01', 'desc': 'INTEREST CREDIT', 'withdrawal': 0, 'deposit': 100, 'balance': 10000},
+            {'date': '2023-01-10', 'desc': 'ELECTRICITY BILL', 'withdrawal': 100, 'deposit': 0, 'balance': 9900},
+            {'date': '2023-02-01', 'desc': 'INTEREST CREDIT', 'withdrawal': 0, 'deposit': 100, 'balance': 10000},
+            {'date': '2023-02-10', 'desc': 'ELECTRICITY BILL', 'withdrawal': 100, 'deposit': 0, 'balance': 9900},
+        ],
+        "The Shopping Spree": [
+            {'date': '2023-01-01', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 5000, 'balance': 5000},
+            {'date': '2023-01-02', 'desc': 'AMAZON INDIA', 'withdrawal': 2000, 'deposit': 0, 'balance': 3000},
+            {'date': '2023-01-03', 'desc': 'FLIPKART', 'withdrawal': 2000, 'deposit': 0, 'balance': 1000},
+            {'date': '2023-01-04', 'desc': 'MYNTRA', 'withdrawal': 1500, 'deposit': 0, 'balance': -500},
+        ],
+        "The Budget Master": [
+            {'date': '2023-01-01', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 4000, 'balance': 4000},
+            {'date': '2023-01-02', 'desc': 'HOUSE RENT', 'withdrawal': 1000, 'deposit': 0, 'balance': 3000},
+            {'date': '2023-01-05', 'desc': 'METRO RECHARGE', 'withdrawal': 100, 'deposit': 0, 'balance': 2900},
+            {'date': '2023-01-10', 'desc': 'GROCERIES', 'withdrawal': 500, 'deposit': 0, 'balance': 2400},
+        ],
+        "The Erratic Spender": [
+            {'date': '2023-01-01', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 5000, 'balance': 5000},
+            {'date': '2023-01-02', 'desc': 'CASH WITHDRAWAL', 'withdrawal': 4000, 'deposit': 0, 'balance': 1000},
+            {'date': '2023-01-05', 'desc': 'ZOMATO', 'withdrawal': 100, 'deposit': 0, 'balance': 900},
+            {'date': '2023-01-10', 'desc': 'CASH DEPOSIT', 'withdrawal': 0, 'deposit': 2000, 'balance': 2900},
+        ],
+        "The Stable Low-Income": [
+            {'date': '2023-01-01', 'desc': 'PART TIME PAY', 'withdrawal': 0, 'deposit': 1500, 'balance': 1500},
+            {'date': '2023-01-05', 'desc': 'BUS PASS', 'withdrawal': 100, 'deposit': 0, 'balance': 1400},
+            {'date': '2023-02-01', 'desc': 'PART TIME PAY', 'withdrawal': 0, 'deposit': 1500, 'balance': 2900},
+            {'date': '2023-02-05', 'desc': 'BUS PASS', 'withdrawal': 100, 'deposit': 0, 'balance': 2800},
+        ],
+        "The Sudden Crash": [
+            {'date': '2023-01-01', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 5000, 'balance': 5000},
+            {'date': '2023-01-05', 'desc': 'RENT', 'withdrawal': 1000, 'deposit': 0, 'balance': 4000},
+            {'date': '2023-02-01', 'desc': 'MEDICAL EMERGENCY', 'withdrawal': 6000, 'deposit': 0, 'balance': -2000},
+            {'date': '2023-02-05', 'desc': 'ZOMATO', 'withdrawal': 200, 'deposit': 0, 'balance': -2200},
+        ],
+        "The Side-Hustler": [
+            {'date': '2023-01-01', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 3000, 'balance': 3000},
+            {'date': '2023-01-15', 'desc': 'FREELANCE WORK', 'withdrawal': 0, 'deposit': 1000, 'balance': 4000},
+            {'date': '2023-01-20', 'desc': 'SHOPPING', 'withdrawal': 500, 'deposit': 0, 'balance': 3500},
+            {'date': '2023-02-01', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 3000, 'balance': 6500},
+        ],
+        "The Ghost Account": [
+            {'date': '2023-01-01', 'desc': 'INITIAL DEPOSIT', 'withdrawal': 0, 'deposit': 100, 'balance': 100},
+            {'date': '2023-01-02', 'desc': 'BANK FEE', 'withdrawal': 50, 'deposit': 0, 'balance': 50},
+            {'date': '2023-01-10', 'desc': 'BANK FEE', 'withdrawal': 50, 'deposit': 0, 'balance': 0},
+            {'date': '2023-01-20', 'desc': 'BANK FEE', 'withdrawal': 50, 'deposit': 0, 'balance': -50},
+        ],
+        "The Recovery Phase": [
+            {'date': '2023-01-01', 'desc': 'OVERDRAFT', 'withdrawal': 0, 'deposit': 0, 'balance': -1000},
+            {'date': '2023-01-10', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 3000, 'balance': 2000},
+            {'date': '2023-01-15', 'desc': 'RENT', 'withdrawal': 800, 'deposit': 0, 'balance': 1200},
+            {'date': '2023-02-01', 'desc': 'SALARY', 'withdrawal': 0, 'deposit': 3000, 'balance': 4200},
+        ],
+    }
 
-    # TEST CASE 2: Stressed User (Irregular income, high burn rate, low balance)
-    stressed_user = [
-        {'date': '2023-01-01', 'desc': 'CASH DEPOSIT', 'withdrawal': 0, 'deposit': 1000, 'balance': 1000},
-        {'date': '2023-01-02', 'desc': 'ZOMATO DELIVERY', 'withdrawal': 500, 'deposit': 0, 'balance': 500},
-        {'date': '2023-01-03', 'desc': 'UBER TRIP', 'withdrawal': 600, 'deposit': 0, 'balance': -100},
-        {'date': '2023-01-10', 'desc': 'SMALL PAYMENT', 'withdrawal': 0, 'deposit': 200, 'balance': 100},
-        {'date': '2023-01-15', 'desc': 'HOUSE RENT', 'withdrawal': 1000, 'deposit': 0, 'balance': -900},
-    ]
-
-    print("Testing Case 1: Stable User...")
-    run_inference(stable_user)
-
-    print("\nTesting Case 2: Stressed User...")
-    run_inference(stressed_user)
+    for name, data in test_cases.items():
+        run_inference(name, data)
