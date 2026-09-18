@@ -68,6 +68,23 @@ def run_inference(customer_name, customer_transactions):
     print("==========================================\n")
 
 if __name__ == "__main__":
+    print("\n" + "="*60)
+    print("            CREDITBRIDGE AI EVALUATION SYSTEM            ")
+    print("="*60)
+    print("\n📌 DEFINITIONS:")
+    print("1. Financial Stress Risk (ML Model):")
+    print("   A binary prediction (High/Low) of whether a customer is likely")
+    print("   to reach a critically low balance within 30 days based on")
+    print("   historical behavioral patterns.")
+    print("\n2. Cash-Flow Stability Score (Heuristic):")
+    print("   A weighted 0-100 score based on:")
+    print("   - Savings Buffer (30%): Balance vs. monthly burn rate")
+    print("   - Income Consistency (20%): Regularity of deposits")
+    print("   - Burn Rate (20%): Spending vs. income ratio")
+    print("   - Withdrawal Volatility (15%): Stability of spending")
+    print("   - Balance Trend (15%): Direction of account balance")
+    print("="*60 + "\n")
+
     test_cases = {
         "The Ideal Saver": [
             {'date': '2023-01-01', 'desc': 'NEFT SALARY CREDIT', 'withdrawal': 0, 'deposit': 5000, 'balance': 5000},
